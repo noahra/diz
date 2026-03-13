@@ -70,7 +70,11 @@ export async function connect(code: string): Promise<void> {
               const serverFingerprint = line.slice(5).trim();
               if (serverFingerprint !== fingerprint) {
                 socket.end();
-                reject(new Error("Certificate fingerprint mismatch — possible MITM attack"));
+                reject(
+                  new Error(
+                    "Certificate fingerprint mismatch — possible MITM attack",
+                  ),
+                );
                 return;
               }
               socket.data.certVerified = true;

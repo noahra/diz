@@ -18,10 +18,14 @@ function randomToken(): string {
 
 function cleanupCerts(): void {
   if (existsSync(CERT_PATH)) {
-    try { unlinkSync(CERT_PATH); } catch {}
+    try {
+      unlinkSync(CERT_PATH);
+    } catch {}
   }
   if (existsSync(KEY_PATH)) {
-    try { unlinkSync(KEY_PATH); } catch {}
+    try {
+      unlinkSync(KEY_PATH);
+    } catch {}
   }
 }
 
@@ -29,16 +33,28 @@ function cleanupCerts(): void {
  * Generates a temporary self-signed EC (P-256) certificate using openssl.
  * Returns { certPem, keyPem, fingerprint } where fingerprint is a 64-char lowercase hex string.
  */
-function generateTLSCert(): { certPem: string; keyPem: string; fingerprint: string } {
+function generateTLSCert(): {
+  certPem: string;
+  keyPem: string;
+  fingerprint: string;
+} {
   const genResult = Bun.spawnSync([
-    "openssl", "req", "-x509",
-    "-newkey", "ec",
-    "-pkeyopt", "ec_paramgen_curve:P-256",
-    "-keyout", KEY_PATH,
-    "-out", CERT_PATH,
-    "-days", "1",
+    "openssl",
+    "req",
+    "-x509",
+    "-newkey",
+    "ec",
+    "-pkeyopt",
+    "ec_paramgen_curve:P-256",
+    "-keyout",
+    KEY_PATH,
+    "-out",
+    CERT_PATH,
+    "-days",
+    "1",
     "-nodes",
-    "-subj", "/CN=diz",
+    "-subj",
+    "/CN=diz",
   ]);
 
   if (genResult.exitCode !== 0) {
@@ -50,9 +66,12 @@ function generateTLSCert(): { certPem: string; keyPem: string; fingerprint: stri
   const keyPem = readFileSync(KEY_PATH, "utf8");
 
   const fpResult = Bun.spawnSync([
-    "openssl", "x509",
-    "-in", CERT_PATH,
-    "-fingerprint", "-sha256",
+    "openssl",
+    "x509",
+    "-in",
+    CERT_PATH,
+    "-fingerprint",
+    "-sha256",
     "-noout",
   ]);
 
@@ -67,7 +86,10 @@ function generateTLSCert(): { certPem: string; keyPem: string; fingerprint: stri
   if (eqIdx === -1) {
     throw new Error(`Unexpected fingerprint output: ${fpOutput}`);
   }
-  const fingerprint = fpOutput.slice(eqIdx + 1).replace(/:/g, "").toLowerCase();
+  const fingerprint = fpOutput
+    .slice(eqIdx + 1)
+    .replace(/:/g, "")
+    .toLowerCase();
   if (fingerprint.length !== 64) {
     throw new Error(`Unexpected fingerprint length: ${fingerprint}`);
   }
