@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync, unlinkSync } from "fs";
 import { homedir, networkInterfaces, userInfo } from "os";
 import { join } from "path";
 
@@ -97,6 +97,8 @@ export async function generateKey(): Promise<string> {
     if (answer.toLowerCase() !== "y") {
       throw new Error("Aborted. Key not overwritten.");
     }
+    unlinkSync(PRIVKEY_PATH);
+    if (existsSync(PUBKEY_PATH)) unlinkSync(PUBKEY_PATH);
   }
 
   const proc = Bun.spawn(

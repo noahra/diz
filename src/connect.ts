@@ -7,14 +7,16 @@ import { readPublicKey } from "./ssh";
  */
 export async function connect(code: string): Promise<void> {
   const decoded = new TextDecoder().decode(base58Decode(code));
-  const lastColon = decoded.lastIndexOf(":");
-  if (lastColon === -1) {
-    throw new Error(`Invalid code: could not parse "ip:port" from "${decoded}"`);
+  const parts = decoded.split(":");
+  if (parts.length < 3) {
+    throw new Error(`Invalid code format.`);
   }
-  const ip = decoded.slice(0, lastColon);
-  const port = parseInt(decoded.slice(lastColon + 1), 10);
+  // ip may contain colons (IPv6), so port is second-to-last, token is last
+  const token = parts[parts.length - 1];
+  const port = parseInt(parts[parts.length - 2], 10);
+  const ip = parts.slice(0, parts.length - 2).join(":");
   if (isNaN(port)) {
-    throw new Error(`Invalid port in decoded code: "${decoded}"`);
+    throw new Error(`Invalid port in code.`);
   }
 
   const keyLine = readPublicKey();
@@ -26,7 +28,7 @@ export async function connect(code: string): Promise<void> {
       socket: {
         open(socket) {
           socket.data = { buf: "" };
-          socket.write(keyLine + "\n");
+          socket.write(`${token} ${keyLine}\n`);
         },
         data(socket, chunk) {
           socket.data.buf += new TextDecoder().decode(chunk);
