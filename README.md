@@ -1,8 +1,12 @@
 # diz
 
-> Have you ever tried to SSH into another machine, only to spend 20 minutes copying keys around like it's 2003 and you're configuring a router? Yeah. Same.
+> Ever tried to SSH into another machine and somehow ended up spending 20 minutes copying keys around like it's 2003?
+>
+> Yeah. Same.
+>
+> **diz** fixes that.
 
-**diz** fixes that. One command on each machine, share a short code, done. You're in.
+Run one command on each machine, share a short code, and you're in. No key juggling required.
 
 ---
 
