@@ -1,7 +1,7 @@
 import { base58Encode } from "./encode";
 import { appendAuthorizedKey, getLocalIP, getUsername } from "./ssh";
 
-const TIMEOUT_MS = 30_000;
+const TIMEOUT_MS = 180_000;
 
 function randomPort(): number {
   return Math.floor(Math.random() * (65535 - 49152) + 49152);
@@ -58,7 +58,7 @@ export async function listen(pb = false): Promise<void> {
     copyToClipboard(code);
     console.log(`(copied to clipboard)`);
   }
-  console.log(`Waiting for connection... (times out in 30s)`);
+  console.log(`Waiting for connection... (times out in 3 minutes)`);
 
   await new Promise<void>((resolve, reject) => {
     const server = Bun.listen<{ buf: string }>({
