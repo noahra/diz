@@ -16,9 +16,13 @@ Run one command on each machine, share a short code, and you're in. No key juggl
 
 ## How it works
 
-| Machine A (server) | Machine B (client) |
-|---|---|
-| ![server](demo-server.gif) | ![client](demo-client.gif) |
+**On the machine you want to connect to:**
+
+![server](demo-server.gif)
+
+**On your machine:**
+
+![client](demo-client.gif)
 
 diz opens a temporary authenticated channel, swaps your public key, adds it to `authorized_keys`, and drops you straight into a shell. No file copying, no manual editing, no crying.
 
