@@ -57,7 +57,7 @@ yay -S diz-bin
 
 ## Using diz across the internet
 
-diz uses your local network IP, so it works out of the box on the same network. For connecting between machines in different locations, pair it with [Tailscale](https://tailscale.com), a free VPN that gives every machine a stable private IP that works globally. Once Tailscale is running, `diz` works exactly the same way across any distance.
+diz uses your local network IP, so it works out of the box on the same network. For connecting between machines in different locations, pair it with a VPN such as [Tailscale](https://tailscale.com), [ZeroTier](https://www.zerotier.com), or [WireGuard](https://www.wireguard.com). Once both machines are on the same virtual network, `diz` works exactly the same way across any distance.
 
 ---
 
