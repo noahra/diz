@@ -1,70 +1,72 @@
 import { describe, it, expect } from "bun:test";
 import { base58Encode, base58Decode } from "./encode";
 
-// Helpers that mirror the logic in connect.ts for parsing and verifying codes
-function parseCode(code: string) {
-  const decoded = new TextDecoder().decode(base58Decode(code));
-  const parts = decoded.split(":");
-  if (parts.length < 4) throw new Error("Invalid code format.");
-  const fingerprint = parts[parts.length - 1];
-  const token = parts[parts.length - 2];
-  const port = parseInt(parts[parts.length - 3], 10);
-  const ip = parts.slice(0, parts.length - 3).join(":");
-  return { ip, port, token, fingerprint };
-}
-
 function makeCode(
   ip: string,
   port: number,
-  token: string,
-  fingerprint: string,
-) {
-  return base58Encode(
-    new TextEncoder().encode(`${ip}:${port}:${token}:${fingerprint}`),
+  tokenHex: string,
+  fingerprintHex: string,
+): string {
+  const packet = new Uint8Array(54);
+  const octets = ip.split(".").map(Number);
+  packet[0] = octets[0];
+  packet[1] = octets[1];
+  packet[2] = octets[2];
+  packet[3] = octets[3];
+  packet[4] = (port >> 8) & 0xff;
+  packet[5] = port & 0xff;
+  const tokenBytes = new Uint8Array(
+    tokenHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)),
   );
+  const fpBytes = new Uint8Array(
+    fingerprintHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)),
+  );
+  packet.set(tokenBytes, 6);
+  packet.set(fpBytes, 22);
+  return base58Encode(packet);
 }
 
-const VALID_FINGERPRINT = "a".repeat(64);
-const VALID_TOKEN = "b".repeat(32);
+function parseCode(code: string) {
+  const packet = base58Decode(code);
+  if (packet.length !== 54) throw new Error("Invalid code format.");
+  const ip = `${packet[0]}.${packet[1]}.${packet[2]}.${packet[3]}`;
+  const port = (packet[4] << 8) | packet[5];
+  const token = Buffer.from(packet.slice(6, 22)).toString("hex");
+  const fingerprint = Buffer.from(packet.slice(22, 54)).toString("hex");
+  return { ip, port, token, fingerprint };
+}
+
+const VALID_FINGERPRINT = "aa".repeat(32); // 64 hex chars = 32 bytes
+const VALID_TOKEN = "bb".repeat(16); // 32 hex chars = 16 bytes
 
 describe("TLS fingerprint verification", () => {
-  it("rejects a code with a fingerprint that is too short", () => {
-    const code = makeCode("192.168.1.1", 51234, VALID_TOKEN, "abc123");
-    expect(() => parseCode(code)).not.toThrow(); // parsing succeeds
-    const { fingerprint } = parseCode(code);
-    expect(fingerprint.length).not.toBe(64); // but fingerprint is invalid
+  it("rejects a code with wrong packet length", () => {
+    const bad = base58Encode(new Uint8Array(10));
+    expect(() => parseCode(bad)).toThrow("Invalid code format.");
   });
 
-  it("rejects a code with an empty fingerprint", () => {
-    const code = makeCode("192.168.1.1", 51234, VALID_TOKEN, "");
-    const { fingerprint } = parseCode(code);
-    expect(fingerprint.length).not.toBe(64);
-  });
-
-  it("accepts a code with a valid 64-char fingerprint", () => {
+  it("accepts a valid binary code", () => {
     const code = makeCode("192.168.1.1", 51234, VALID_TOKEN, VALID_FINGERPRINT);
     const { fingerprint } = parseCode(code);
-    expect(fingerprint.length).toBe(64);
     expect(fingerprint).toBe(VALID_FINGERPRINT);
   });
 
   it("detects a tampered fingerprint", () => {
     const code = makeCode("192.168.1.1", 51234, VALID_TOKEN, VALID_FINGERPRINT);
     const { fingerprint } = parseCode(code);
-    const tamperedFingerprint = "f".repeat(64);
-    expect(fingerprint).not.toBe(tamperedFingerprint);
+    expect(fingerprint).not.toBe("ff".repeat(32));
   });
 
-  it("detects a one-character change in the fingerprint", () => {
+  it("detects a one-byte change in the fingerprint", () => {
     const original = VALID_FINGERPRINT;
-    const tampered = "b" + original.slice(1); // flip first char
+    const tampered = "cc" + original.slice(2);
     const code = makeCode("192.168.1.1", 51234, VALID_TOKEN, original);
     const { fingerprint } = parseCode(code);
     expect(fingerprint).toBe(original);
     expect(fingerprint).not.toBe(tampered);
   });
 
-  it("preserves ip, port and token correctly in the code", () => {
+  it("preserves ip, port and token correctly", () => {
     const code = makeCode("10.0.0.5", 55000, VALID_TOKEN, VALID_FINGERPRINT);
     const { ip, port, token, fingerprint } = parseCode(code);
     expect(ip).toBe("10.0.0.5");
@@ -76,24 +78,15 @@ describe("TLS fingerprint verification", () => {
 
 describe("MITM simulation", () => {
   it("client rejects server fingerprint that does not match the code", () => {
-    const legitimateFingerprint = "a".repeat(64);
-    const attackerFingerprint = "b".repeat(64); // what a MITM server would send
-
-    // Simulate the client-side check in connect.ts
-    const serverFingerprint = attackerFingerprint;
-    const codeFingerprint = legitimateFingerprint;
-
-    expect(serverFingerprint).not.toBe(codeFingerprint);
+    const legitimateFingerprint = "aa".repeat(32);
+    const attackerFingerprint = "bb".repeat(32);
+    expect(attackerFingerprint).not.toBe(legitimateFingerprint);
     // → connect.ts would throw "Certificate fingerprint mismatch — possible MITM attack"
   });
 
   it("client accepts server fingerprint that matches the code", () => {
-    const fingerprint =
-      "c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2";
-    const serverFingerprint = fingerprint;
-    const codeFingerprint = fingerprint;
-
-    expect(serverFingerprint).toBe(codeFingerprint);
+    const fingerprint = "c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2";
+    expect(fingerprint).toBe(fingerprint);
     // → connect.ts would proceed normally
   });
 });

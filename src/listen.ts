@@ -10,10 +10,34 @@ function randomPort(): number {
   return Math.floor(Math.random() * (65535 - 49152) + 49152);
 }
 
-function randomToken(): string {
+function randomTokenBytes(): Uint8Array {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
+  return bytes;
+}
+
+function bytesToHex(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("hex");
+}
+
+function encodeCode(
+  ip: string,
+  port: number,
+  tokenBytes: Uint8Array,
+  fingerprintBytes: Uint8Array,
+): Uint8Array {
+  // [4 bytes IP][2 bytes port big-endian][16 bytes token][32 bytes fingerprint]
+  const packet = new Uint8Array(54);
+  const octets = ip.split(".").map(Number);
+  packet[0] = octets[0];
+  packet[1] = octets[1];
+  packet[2] = octets[2];
+  packet[3] = octets[3];
+  packet[4] = (port >> 8) & 0xff;
+  packet[5] = port & 0xff;
+  packet.set(tokenBytes, 6);
+  packet.set(fingerprintBytes, 22);
+  return packet;
 }
 
 function cleanupCerts(): void {
@@ -36,7 +60,8 @@ function cleanupCerts(): void {
 function generateTLSCert(): {
   certPem: string;
   keyPem: string;
-  fingerprint: string;
+  fingerprintHex: string;
+  fingerprintBytes: Uint8Array;
 } {
   const genResult = Bun.spawnSync([
     "openssl",
@@ -86,15 +111,18 @@ function generateTLSCert(): {
   if (eqIdx === -1) {
     throw new Error(`Unexpected fingerprint output: ${fpOutput}`);
   }
-  const fingerprint = fpOutput
+  const fingerprintHex = fpOutput
     .slice(eqIdx + 1)
     .replace(/:/g, "")
     .toLowerCase();
-  if (fingerprint.length !== 64) {
-    throw new Error(`Unexpected fingerprint length: ${fingerprint}`);
+  if (fingerprintHex.length !== 64) {
+    throw new Error(`Unexpected fingerprint length: ${fingerprintHex}`);
   }
+  const fingerprintBytes = new Uint8Array(
+    fingerprintHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)),
+  );
 
-  return { certPem, keyPem, fingerprint };
+  return { certPem, keyPem, fingerprintHex, fingerprintBytes };
 }
 
 /**
@@ -120,17 +148,20 @@ function copyToClipboard(text: string): void {
 export async function listen(pb = false): Promise<void> {
   let certPem: string;
   let keyPem: string;
-  let fingerprint: string;
+  let fingerprintHex: string;
+  let fingerprintBytes: Uint8Array;
 
   try {
-    ({ certPem, keyPem, fingerprint } = generateTLSCert());
+    ({ certPem, keyPem, fingerprintHex, fingerprintBytes } =
+      generateTLSCert());
   } catch (err) {
     cleanupCerts();
     throw err;
   }
 
   const ip = getLocalIP();
-  const token = randomToken();
+  const tokenBytes = randomTokenBytes();
+  const token = bytesToHex(tokenBytes);
 
   // Find an available port before printing the code
   let port: number;
@@ -151,9 +182,7 @@ export async function listen(pb = false): Promise<void> {
     }
   }
 
-  const code = base58Encode(
-    new TextEncoder().encode(`${ip}:${port!}:${token}:${fingerprint}`),
-  );
+  const code = base58Encode(encodeCode(ip, port!, tokenBytes, fingerprintBytes));
   console.log(`Share this code: ${code}`);
   if (pb) {
     copyToClipboard(code);
@@ -174,7 +203,7 @@ export async function listen(pb = false): Promise<void> {
           open(socket) {
             socket.data = { buf: "" };
             // Send fingerprint first so client can verify before token exchange
-            socket.write(`CERT ${fingerprint}\n`);
+            socket.write(`CERT ${fingerprintHex}\n`);
           },
           data(socket, chunk) {
             socket.data.buf += new TextDecoder().decode(chunk);

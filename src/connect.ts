@@ -9,29 +9,26 @@ import { homedir } from "os";
  * server, verifies the certificate fingerprint, sends the local public key,
  * waits for "OK <username>", then spawns an interactive SSH session.
  */
+function decodeCode(code: string): {
+  ip: string;
+  port: number;
+  token: string;
+  fingerprint: string;
+} {
+  // Binary packet: [4 bytes IP][2 bytes port][16 bytes token][32 bytes fingerprint]
+  const packet = base58Decode(code);
+  if (packet.length !== 54) {
+    throw new Error("Invalid code format.");
+  }
+  const ip = `${packet[0]}.${packet[1]}.${packet[2]}.${packet[3]}`;
+  const port = (packet[4] << 8) | packet[5];
+  const token = Buffer.from(packet.slice(6, 22)).toString("hex");
+  const fingerprint = Buffer.from(packet.slice(22, 54)).toString("hex");
+  return { ip, port, token, fingerprint };
+}
+
 export async function connect(code: string): Promise<void> {
-  const decoded = new TextDecoder().decode(base58Decode(code));
-  const parts = decoded.split(":");
-
-  // Format: ip:port:token:fingerprint
-  // ip may contain colons (IPv6), so fingerprint is last, token second-to-last,
-  // port third-to-last, ip is everything before that.
-  if (parts.length < 4) {
-    throw new Error(`Invalid code format.`);
-  }
-
-  const fingerprint = parts[parts.length - 1];
-  const token = parts[parts.length - 2];
-  const port = parseInt(parts[parts.length - 3], 10);
-  const ip = parts.slice(0, parts.length - 3).join(":");
-
-  if (isNaN(port)) {
-    throw new Error(`Invalid port in code.`);
-  }
-
-  if (fingerprint.length !== 64) {
-    throw new Error(`Invalid fingerprint in code.`);
-  }
+  const { ip, port, token, fingerprint } = decodeCode(code);
 
   if (!existsSync(join(homedir(), ".ssh", "id_ed25519"))) {
     console.log("No SSH key found, generating one...");
