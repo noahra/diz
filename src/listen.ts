@@ -19,8 +19,11 @@ function randomToken(): string {
  * adds it to authorized_keys, and responds with "OK <username>".
  */
 function copyToClipboard(text: string): void {
-  const cmd = process.platform === "darwin" ? "pbcopy" : "xclip -selection clipboard";
-  const proc = Bun.spawnSync(cmd.split(" "), { stdin: new TextEncoder().encode(text) });
+  const cmd =
+    process.platform === "darwin" ? "pbcopy" : "xclip -selection clipboard";
+  const proc = Bun.spawnSync(cmd.split(" "), {
+    stdin: new TextEncoder().encode(text),
+  });
   if (proc.exitCode !== 0) throw new Error("Failed to copy to clipboard.");
 }
 
