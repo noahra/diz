@@ -1,8 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "fs";
-import { homedir } from "os";
+import { homedir, networkInterfaces, userInfo } from "os";
 import { join } from "path";
 
 const SSH_DIR = join(homedir(), ".ssh");
+const PRIVKEY_PATH = join(SSH_DIR, "id_ed25519");
 const PUBKEY_PATH = join(SSH_DIR, "id_ed25519.pub");
 const AUTHORIZED_KEYS_PATH = join(SSH_DIR, "authorized_keys");
 
@@ -73,4 +74,79 @@ export function appendAuthorizedKey(keyLine: string): void {
   chmodSync(AUTHORIZED_KEYS_PATH, 0o600);
 
   console.log(`Public key added to ${AUTHORIZED_KEYS_PATH}`);
+}
+
+/**
+ * Generates ~/.ssh/id_ed25519 (and .pub) via ssh-keygen.
+ * Prompts for confirmation if the key already exists.
+ * Returns the new public key line after generation.
+ */
+export async function generateKey(): Promise<string> {
+  if (existsSync(PRIVKEY_PATH)) {
+    process.stdout.write("Key already exists. Overwrite? (y/N) ");
+    const answer = await new Promise<string>((resolve) => {
+      let buf = "";
+      process.stdin.setEncoding("utf8");
+      process.stdin.resume();
+      process.stdin.once("data", (chunk: string) => {
+        buf += chunk;
+        process.stdin.pause();
+        resolve(buf.trim());
+      });
+    });
+    if (answer.toLowerCase() !== "y") {
+      throw new Error("Aborted. Key not overwritten.");
+    }
+  }
+
+  const proc = Bun.spawn(
+    ["ssh-keygen", "-t", "ed25519", "-f", PRIVKEY_PATH, "-N", ""],
+    { stdin: "ignore", stdout: "ignore", stderr: "pipe" }
+  );
+  const exitCode = await proc.exited;
+  if (exitCode !== 0) {
+    const errText = await new Response(proc.stderr).text();
+    throw new Error(`ssh-keygen failed: ${errText.trim()}`);
+  }
+
+  return readPublicKey();
+}
+
+/**
+ * Returns the first non-internal IPv4 address, preferring en0/eth0.
+ */
+export function getLocalIP(): string {
+  const ifaces = networkInterfaces();
+  const preferred = ["en0", "eth0"];
+
+  // Try preferred interfaces first
+  for (const name of preferred) {
+    const addrs = ifaces[name];
+    if (addrs) {
+      for (const addr of addrs) {
+        if (addr.family === "IPv4" && !addr.internal) {
+          return addr.address;
+        }
+      }
+    }
+  }
+
+  // Fall back to any non-internal IPv4
+  for (const addrs of Object.values(ifaces)) {
+    if (!addrs) continue;
+    for (const addr of addrs) {
+      if (addr.family === "IPv4" && !addr.internal) {
+        return addr.address;
+      }
+    }
+  }
+
+  throw new Error("Could not determine local IP address.");
+}
+
+/**
+ * Returns the current OS username.
+ */
+export function getUsername(): string {
+  return userInfo().username;
 }
