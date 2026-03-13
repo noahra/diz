@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="diz.svg" alt="diz" width="200" />
+  <img src="diz.svg" alt="diz" />
 </p>
 
 # diz
