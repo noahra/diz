@@ -49,4 +49,3 @@ yay -S diz-bin
 | ---------------------- | ----------------------------------------- |
 | `diz --listen`         | Advertise this machine and wait for a key |
 | `diz --connect <code>` | Send your key and SSH in                  |
-| `diz -gk`              | Generate a new ed25519 key pair           |
