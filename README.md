@@ -16,21 +16,11 @@ Run one command on each machine, share a short code, and you're in. No key juggl
 
 ## How it works
 
-**On the machine you want to connect to:**
+| Machine A (server) | Machine B (client) |
+|---|---|
+| ![server](demo-server.gif) | ![client](demo-client.gif) |
 
-```bash
-diz --listen
-# → Share this code: 3vQB7B6MiUc9fNe2...
-```
-
-**On your machine:**
-
-```bash
-diz --connect 3vQB7B6MiUc9fNe2...
-# → key exchanged, SSH session starts automatically
-```
-
-That's it. diz opens a temporary authenticated channel, swaps your public key, adds it to `authorized_keys`, and drops you straight into a shell. No file copying, no manual editing, no crying.
+diz opens a temporary authenticated channel, swaps your public key, adds it to `authorized_keys`, and drops you straight into a shell. No file copying, no manual editing, no crying.
 
 ---
 
