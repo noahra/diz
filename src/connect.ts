@@ -1,5 +1,8 @@
 import { base58Decode } from "./encode";
-import { readPublicKey } from "./ssh";
+import { readPublicKey, generateKey } from "./ssh";
+import { existsSync } from "fs";
+import { join } from "path";
+import { homedir } from "os";
 
 /**
  * Decodes the base58 code to "ip:port", sends the local public key to the
@@ -17,6 +20,11 @@ export async function connect(code: string): Promise<void> {
   const ip = parts.slice(0, parts.length - 2).join(":");
   if (isNaN(port)) {
     throw new Error(`Invalid port in code.`);
+  }
+
+  if (!existsSync(join(homedir(), ".ssh", "id_ed25519"))) {
+    console.log("No SSH key found, generating one...");
+    await generateKey();
   }
 
   const keyLine = readPublicKey();
