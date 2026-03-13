@@ -18,7 +18,13 @@ function randomToken(): string {
  * connection, verifies the one-time token, receives the client's public key,
  * adds it to authorized_keys, and responds with "OK <username>".
  */
-export async function listen(): Promise<void> {
+function copyToClipboard(text: string): void {
+  const cmd = process.platform === "darwin" ? "pbcopy" : "xclip -selection clipboard";
+  const proc = Bun.spawnSync(cmd.split(" "), { stdin: new TextEncoder().encode(text) });
+  if (proc.exitCode !== 0) throw new Error("Failed to copy to clipboard.");
+}
+
+export async function listen(pb = false): Promise<void> {
   const ip = getLocalIP();
   const token = randomToken();
 
@@ -45,6 +51,10 @@ export async function listen(): Promise<void> {
     new TextEncoder().encode(`${ip}:${port!}:${token}`),
   );
   console.log(`Share this code: ${code}`);
+  if (pb) {
+    copyToClipboard(code);
+    console.log(`(copied to clipboard)`);
+  }
   console.log(`Waiting for connection... (times out in 30s)`);
 
   await new Promise<void>((resolve, reject) => {

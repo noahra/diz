@@ -17,6 +17,7 @@ program
     "-l, --listen",
     "Start a TCP server to receive a client's public key (run on server)",
   )
+  .option("-pb, --pb", "Copy the share code to clipboard (use with --listen)")
   .option(
     "-c, --connect <code>",
     "Connect to a listening server using its share code (run on client)",
@@ -26,12 +27,13 @@ program.parse(process.argv);
 
 const opts = program.opts<{
   listen?: boolean;
+  pb?: boolean;
   connect?: string;
 }>();
 
 if (opts.listen) {
   try {
-    await listen();
+    await listen(opts.pb);
   } catch (err) {
     console.error(`Error: ${(err as Error).message}`);
     process.exit(1);
