@@ -1,0 +1,136 @@
+name: CD
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build binaries
+        run: |
+          bun build --compile --target=bun-darwin-arm64 src/index.ts --outfile diz-darwin-arm64
+          bun build --compile --target=bun-darwin-x64 src/index.ts --outfile diz-darwin-x64
+          bun build --compile --target=bun-linux-x64 src/index.ts --outfile diz-linux-x64
+
+      - name: Compute checksums
+        id: checksums
+        run: |
+          echo "arm64=$(shasum -a 256 diz-darwin-arm64 | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          echo "x64=$(shasum -a 256 diz-darwin-x64 | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          echo "linux=$(shasum -a 256 diz-linux-x64 | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            diz-darwin-arm64
+            diz-darwin-x64
+            diz-linux-x64
+
+      - name: Update Homebrew formula
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          git clone https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/noahra/homebrew-diz.git homebrew-diz
+          cat > homebrew-diz/Formula/diz.rb << EOF
+          class Diz < Formula
+            desc "Share SSH public keys between machines via a compact passphrase"
+            homepage "https://github.com/noahra/diz"
+            version "${VERSION}"
+
+            on_macos do
+              if Hardware::CPU.arm?
+                url "https://github.com/noahra/diz/releases/download/${GITHUB_REF_NAME}/diz-darwin-arm64"
+                sha256 "${{ steps.checksums.outputs.arm64 }}"
+
+                def install
+                  bin.install "diz-darwin-arm64" => "diz"
+                end
+              else
+                url "https://github.com/noahra/diz/releases/download/${GITHUB_REF_NAME}/diz-darwin-x64"
+                sha256 "${{ steps.checksums.outputs.x64 }}"
+
+                def install
+                  bin.install "diz-darwin-x64" => "diz"
+                end
+              end
+            end
+
+            test do
+              system "#{bin}/diz", "--version"
+            end
+          end
+          EOF
+          cd homebrew-diz
+          git config user.email "cd@github-actions"
+          git config user.name "GitHub Actions"
+          git add Formula/diz.rb
+          git commit -m "Update diz to ${GITHUB_REF_NAME}"
+          git push
+
+      - name: Update AUR package
+        env:
+          AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          mkdir -p ~/.ssh
+          echo "${AUR_SSH_KEY}" > ~/.ssh/aur
+          chmod 600 ~/.ssh/aur
+          ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts
+          git clone ssh://aur@aur.archlinux.org/diz-bin.git aur-diz \
+            --config core.sshCommand="ssh -i ~/.ssh/aur"
+
+          cat > aur-diz/PKGBUILD << EOF
+          # Maintainer: noahra
+          pkgname=diz-bin
+          pkgver=${VERSION}
+          pkgrel=1
+          pkgdesc="Share SSH public keys between machines via a compact passphrase"
+          arch=('x86_64')
+          url="https://github.com/noahra/diz"
+          license=('MIT')
+          provides=('diz')
+          conflicts=('diz')
+          source_x86_64=("\${url}/releases/download/v\${pkgver}/diz-linux-x64")
+          sha256sums_x86_64=('${{ steps.checksums.outputs.linux }}')
+
+          package() {
+              install -Dm755 "\${srcdir}/diz-linux-x64" "\${pkgdir}/usr/bin/diz"
+          }
+          EOF
+
+          cat > aur-diz/.SRCINFO << EOF
+          pkgbase = diz-bin
+          	pkgdesc = Share SSH public keys between machines via a compact passphrase
+          	pkgver = ${VERSION}
+          	pkgrel = 1
+          	url = https://github.com/noahra/diz
+          	arch = x86_64
+          	license = MIT
+          	provides = diz
+          	conflicts = diz
+
+          pkgname = diz-bin
+          	source_x86_64 = https://github.com/noahra/diz/releases/download/v${VERSION}/diz-linux-x64
+          	sha256sums_x86_64 = ${{ steps.checksums.outputs.linux }}
+          EOF
+
+          cd aur-diz
+          git config user.email "cd@github-actions"
+          git config user.name "GitHub Actions"
+          git add PKGBUILD .SRCINFO
+          git commit -m "Update diz-bin to ${GITHUB_REF_NAME}"
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/aur" git push
