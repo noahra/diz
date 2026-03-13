@@ -13,7 +13,6 @@ function randomToken(): string {
   return Buffer.from(bytes).toString("hex");
 }
 
-
 /**
  * Starts a TCP server on a random port, waits up to 30s for one client
  * connection, verifies the one-time token, receives the client's public key,
@@ -37,11 +36,14 @@ export async function listen(): Promise<void> {
       probe.stop(true);
       break;
     } catch {
-      if (i === 9) throw new Error("Could not find an available port after 10 attempts.");
+      if (i === 9)
+        throw new Error("Could not find an available port after 10 attempts.");
     }
   }
 
-  const code = base58Encode(new TextEncoder().encode(`${ip}:${port!}:${token}`));
+  const code = base58Encode(
+    new TextEncoder().encode(`${ip}:${port!}:${token}`),
+  );
   console.log(`Share this code: ${code}`);
   console.log(`Waiting for connection... (times out in 30s)`);
 

@@ -1,4 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync, unlinkSync } from "fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  chmodSync,
+  unlinkSync,
+} from "fs";
 import { homedir, networkInterfaces, userInfo } from "os";
 import { join } from "path";
 
@@ -55,7 +62,9 @@ export function appendAuthorizedKey(keyLine: string): void {
       if (lineParts.length >= 2) {
         const normalizedLine = `${lineParts[0]} ${lineParts[1]}`;
         if (normalizedLine === normalizedKey) {
-          console.log("Key is already present in authorized_keys. Nothing to do.");
+          console.log(
+            "Key is already present in authorized_keys. Nothing to do.",
+          );
           return;
         }
       }
@@ -103,7 +112,7 @@ export async function generateKey(): Promise<string> {
 
   const proc = Bun.spawn(
     ["ssh-keygen", "-t", "ed25519", "-f", PRIVKEY_PATH, "-N", ""],
-    { stdin: "ignore", stdout: "ignore", stderr: "pipe" }
+    { stdin: "ignore", stdout: "ignore", stderr: "pipe" },
   );
   const exitCode = await proc.exited;
   if (exitCode !== 0) {

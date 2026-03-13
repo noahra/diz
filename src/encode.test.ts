@@ -10,7 +10,8 @@ describe("base58Encode / base58Decode", () => {
   });
 
   it("round-trips an SSH public key line", () => {
-    const key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBN9Bj7hTBxCOuHRn1kHPr0Lk8qBvBzIxXyZGz3eU+Fw";
+    const key =
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBN9Bj7hTBxCOuHRn1kHPr0Lk8qBvBzIxXyZGz3eU+Fw";
     const input = new TextEncoder().encode(key);
     const encoded = base58Encode(input);
     const decoded = base58Decode(encoded);
@@ -18,10 +19,14 @@ describe("base58Encode / base58Decode", () => {
   });
 
   it("round-trips an ip:port:token string", () => {
-    const input = new TextEncoder().encode("192.168.1.42:51234:abcdef1234567890abcdef1234567890");
+    const input = new TextEncoder().encode(
+      "192.168.1.42:51234:abcdef1234567890abcdef1234567890",
+    );
     const encoded = base58Encode(input);
     const decoded = base58Decode(encoded);
-    expect(new TextDecoder().decode(decoded)).toBe("192.168.1.42:51234:abcdef1234567890abcdef1234567890");
+    expect(new TextDecoder().decode(decoded)).toBe(
+      "192.168.1.42:51234:abcdef1234567890abcdef1234567890",
+    );
   });
 
   it("handles leading zero bytes", () => {
@@ -43,11 +48,15 @@ describe("base58Encode / base58Decode", () => {
   it("only uses valid base58 alphabet characters", () => {
     const input = new TextEncoder().encode("test string 123");
     const encoded = base58Encode(input);
-    expect(encoded).toMatch(/^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]*$/);
+    expect(encoded).toMatch(
+      /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]*$/,
+    );
   });
 
   it("throws on invalid base58 character", () => {
-    expect(() => base58Decode("invalid!char")).toThrow("Invalid base58 character");
+    expect(() => base58Decode("invalid!char")).toThrow(
+      "Invalid base58 character",
+    );
   });
 
   it("throws on character not in alphabet (0, O, I, l)", () => {

@@ -26,22 +26,32 @@ function isDuplicateKey(existing: string, keyLine: string): boolean {
 describe("parsePublicKeyLine", () => {
   it("strips comment from key line", () => {
     const line = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA my-comment";
-    expect(parsePublicKeyLine(line)).toBe("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA");
+    expect(parsePublicKeyLine(line)).toBe(
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA",
+    );
   });
 
   it("handles key with no comment", () => {
     const line = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA";
-    expect(parsePublicKeyLine(line)).toBe("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA");
+    expect(parsePublicKeyLine(line)).toBe(
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA",
+    );
   });
 
   it("handles extra whitespace", () => {
     const line = "  ssh-ed25519   AAAAC3NzaC1lZDI1NTE5AAAA   comment  ";
-    expect(parsePublicKeyLine(line)).toBe("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA");
+    expect(parsePublicKeyLine(line)).toBe(
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA",
+    );
   });
 
   it("throws on malformed key", () => {
-    expect(() => parsePublicKeyLine("ssh-ed25519")).toThrow("Unexpected public key format");
-    expect(() => parsePublicKeyLine("")).toThrow("Unexpected public key format");
+    expect(() => parsePublicKeyLine("ssh-ed25519")).toThrow(
+      "Unexpected public key format",
+    );
+    expect(() => parsePublicKeyLine("")).toThrow(
+      "Unexpected public key format",
+    );
   });
 });
 
@@ -52,19 +62,30 @@ describe("isDuplicateKey", () => {
   ].join("\n");
 
   it("detects an exact duplicate", () => {
-    expect(isDuplicateKey(existingKeys, "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA1")).toBe(true);
+    expect(
+      isDuplicateKey(existingKeys, "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA1"),
+    ).toBe(true);
   });
 
   it("detects duplicate even if incoming has a comment", () => {
-    expect(isDuplicateKey(existingKeys, "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA2 some-comment")).toBe(true);
+    expect(
+      isDuplicateKey(
+        existingKeys,
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA2 some-comment",
+      ),
+    ).toBe(true);
   });
 
   it("returns false for a new key", () => {
-    expect(isDuplicateKey(existingKeys, "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA3")).toBe(false);
+    expect(
+      isDuplicateKey(existingKeys, "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA3"),
+    ).toBe(false);
   });
 
   it("returns false for empty authorized_keys", () => {
-    expect(isDuplicateKey("", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA1")).toBe(false);
+    expect(isDuplicateKey("", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA1")).toBe(
+      false,
+    );
   });
 });
 
@@ -98,6 +119,8 @@ describe("authorized_keys file handling", () => {
     const entry = (needsNewline ? "\n" : "") + newKey + "\n";
     writeFileSync(authKeysPath, existing + entry);
     const contents = readFileSync(authKeysPath, "utf8");
-    expect(contents).toBe("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA1\nssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA2\n");
+    expect(contents).toBe(
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA1\nssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA2\n",
+    );
   });
 });

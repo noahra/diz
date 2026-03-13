@@ -7,12 +7,20 @@ const program = new Command();
 
 program
   .name("diz")
-  .description("Share SSH public keys between machines via a compact passphrase")
+  .description(
+    "Share SSH public keys between machines via a compact passphrase",
+  )
   .version("0.1.0");
 
 program
-  .option("-l, --listen", "Start a TCP server to receive a client's public key (run on server)")
-  .option("-c, --connect <code>", "Connect to a listening server using its share code (run on client)");
+  .option(
+    "-l, --listen",
+    "Start a TCP server to receive a client's public key (run on server)",
+  )
+  .option(
+    "-c, --connect <code>",
+    "Connect to a listening server using its share code (run on client)",
+  );
 
 program.parse(process.argv);
 
