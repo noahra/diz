@@ -1,0 +1,11 @@
+node_modules/
+bun.lockb
+
+# compiled binaries
+diz
+diz-darwin-arm64
+diz-darwin-x64
+diz-linux-x64
+
+# bun cache
+.bun/
