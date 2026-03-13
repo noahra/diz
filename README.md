@@ -55,6 +55,12 @@ yay -S diz-bin
 
 ---
 
+## Using diz across the internet
+
+diz uses your local network IP, so it works out of the box on the same network. For connecting between machines in different locations, pair it with [Tailscale](https://tailscale.com), a free VPN that gives every machine a stable private IP that works globally. Once Tailscale is running, `diz` works exactly the same way across any distance.
+
+---
+
 ## Security
 
-diz uses TLS with certificate pinning for the key exchange. The connection is encrypted end-to-end and protected against man-in-the-middle attacks. Each session generates a one-time certificate — the fingerprint is embedded in the share code, so any tampering is detected and the connection is aborted immediately.
+diz uses TLS with certificate pinning for the key exchange. The connection is encrypted end-to-end and protected against man-in-the-middle attacks. Each session generates a one-time certificate, and the fingerprint is embedded in the share code, so any tampering is detected and the connection is aborted immediately.
