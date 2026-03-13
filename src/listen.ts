@@ -152,8 +152,7 @@ export async function listen(pb = false): Promise<void> {
   let fingerprintBytes: Uint8Array;
 
   try {
-    ({ certPem, keyPem, fingerprintHex, fingerprintBytes } =
-      generateTLSCert());
+    ({ certPem, keyPem, fingerprintHex, fingerprintBytes } = generateTLSCert());
   } catch (err) {
     cleanupCerts();
     throw err;
@@ -182,7 +181,9 @@ export async function listen(pb = false): Promise<void> {
     }
   }
 
-  const code = base58Encode(encodeCode(ip, port!, tokenBytes, fingerprintBytes));
+  const code = base58Encode(
+    encodeCode(ip, port!, tokenBytes, fingerprintBytes),
+  );
   console.log(`Share this code: ${code}`);
   if (pb) {
     copyToClipboard(code);

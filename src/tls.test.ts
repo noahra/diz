@@ -85,7 +85,8 @@ describe("MITM simulation", () => {
   });
 
   it("client accepts server fingerprint that matches the code", () => {
-    const fingerprint = "c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2";
+    const fingerprint =
+      "c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2";
     expect(fingerprint).toBe(fingerprint);
     // → connect.ts would proceed normally
   });
