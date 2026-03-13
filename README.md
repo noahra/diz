@@ -53,7 +53,14 @@ yay -S diz-bin
 
 ## All commands
 
-| Command                | What it does                              |
-| ---------------------- | ----------------------------------------- |
-| `diz --listen`         | Advertise this machine and wait for a key |
-| `diz --connect <code>` | Send your key and SSH in                  |
+| Command                    | What it does                                        |
+| -------------------------- | --------------------------------------------------- |
+| `diz --listen`             | Advertise this machine and wait for a key           |
+| `diz --listen --pb`        | Same, but copy the share code to clipboard          |
+| `diz --connect <code>`     | Send your key and SSH in                            |
+
+---
+
+## Security
+
+diz uses TLS with certificate pinning for the key exchange. The connection is encrypted end-to-end and protected against man-in-the-middle attacks. Each session generates a one-time certificate — the fingerprint is embedded in the share code, so any tampering is detected and the connection is aborted immediately.
