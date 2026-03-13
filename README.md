@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="diz.svg" alt="diz" width="200" />
+</p>
+
 # diz
 
 > Ever tried to SSH into another machine and somehow ended up spending 20 minutes copying keys around like it's 2003?
