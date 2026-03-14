@@ -111,7 +111,7 @@ function exchangeKey(
   keyLine: string,
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
-    Bun.connect<{ buf: string }>({
+    Bun.connect<{ buf: string; certReceived: boolean }>({
       hostname: ip,
       port,
       tls: {
@@ -120,8 +120,7 @@ function exchangeKey(
       },
       socket: {
         open(socket) {
-          socket.data = { buf: "" };
-          socket.write(`${token} ${keyLine}\n`);
+          socket.data = { buf: "", certReceived: false };
         },
         data(socket, chunk) {
           socket.data.buf += new TextDecoder().decode(chunk);
@@ -130,6 +129,16 @@ function exchangeKey(
           if (newlineIdx === -1) return;
 
           const line = socket.data.buf.slice(0, newlineIdx).trim();
+          socket.data.buf = socket.data.buf.slice(newlineIdx + 1);
+
+          if (!socket.data.certReceived) {
+            // Server always sends CERT first — discard it, cert was already
+            // verified in step 1. Now send credentials over the pinned connection.
+            socket.data.certReceived = true;
+            socket.write(`${token} ${keyLine}\n`);
+            return;
+          }
+
           socket.end();
           resolve(line);
         },
