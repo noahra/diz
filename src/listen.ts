@@ -1,10 +1,14 @@
 import { base58Encode } from "./encode";
 import { appendAuthorizedKey, getLocalIP, getUsername } from "./ssh";
 import { readFileSync, unlinkSync, existsSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
+import { randomBytes } from "crypto";
 
 const TIMEOUT_MS = 180_000;
-const CERT_PATH = "/tmp/diz-cert.pem";
-const KEY_PATH = "/tmp/diz-key.pem";
+const uniqueId = randomBytes(4).toString("hex");
+const CERT_PATH = join(tmpdir(), `diz-cert-${uniqueId}.pem`);
+const KEY_PATH = join(tmpdir(), `diz-key-${uniqueId}.pem`);
 
 function checkDependencies(): void {
   for (const bin of ["openssl", "ssh-keygen"]) {
