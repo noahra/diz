@@ -136,16 +136,21 @@ export async function connect(code: string, temp = false): Promise<void> {
   const username = response.slice(3).trim();
   console.log(`Connected! Logging in as ${username}@${ip}...`);
 
-  const ssh = Bun.spawn(["ssh", `${username}@${ip}`], {
-    stdin: "inherit",
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  await ssh.exited;
-
   if (temp && !keyExistedBefore) {
+    const ssh = Bun.spawn(["ssh", `${username}@${ip}`], {
+      stdin: "inherit",
+      stdout: "inherit",
+      stderr: "inherit",
+    });
+    await ssh.exited;
     unlinkSync(privKeyPath);
     if (existsSync(pubKeyPath)) unlinkSync(pubKeyPath);
     console.log("Temporary session ended. SSH keys deleted.");
+  } else {
+    Bun.spawnSync(["ssh", `${username}@${ip}`], {
+      stdin: "inherit",
+      stdout: "inherit",
+      stderr: "inherit",
+    });
   }
 }
