@@ -17,7 +17,7 @@ program
     "-l, --listen",
     "Start a TCP server to receive a client's public key (run on server)",
   )
-  .option("-pb, --pb", "Copy the share code to clipboard (use with --listen)")
+  .option("-p, --pb", "Copy the share code to clipboard (use with --listen)")
   .option(
     "-c, --connect <code>",
     "Connect to a listening server using its share code (run on client)",
