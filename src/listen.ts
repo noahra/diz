@@ -184,8 +184,6 @@ export async function listen(pb = false): Promise<void> {
   }
   console.log(`Waiting for connection... (times out in 3 minutes)`);
 
-  let certRetrievalDone = false;
-
   try {
     await new Promise<void>((resolve, reject) => {
       const server = Bun.listen<{ buf: string }>({
@@ -198,14 +196,9 @@ export async function listen(pb = false): Promise<void> {
         socket: {
           open(socket) {
             socket.data = { buf: "" };
-            if (!certRetrievalDone) {
-              socket.write(`CERT ${fingerprintHex} ${certPemBase64}\n`);
-              socket.end();
-            }
+            socket.write(`CERT ${fingerprintHex} ${certPemBase64}\n`);
           },
           data(socket, chunk) {
-            if (!certRetrievalDone) return;
-
             socket.data.buf += new TextDecoder().decode(chunk);
 
             const newlineIdx = socket.data.buf.indexOf("\n");
@@ -225,8 +218,6 @@ export async function listen(pb = false): Promise<void> {
 
             if (receivedToken !== token) {
               socket.end();
-              server.stop(true);
-              reject(new Error("Invalid token — connection rejected."));
               return;
             }
 
@@ -251,9 +242,7 @@ export async function listen(pb = false): Promise<void> {
             server.stop(true);
             reject(err);
           },
-          close() {
-            certRetrievalDone = true;
-          },
+          close() {},
         },
       });
 
