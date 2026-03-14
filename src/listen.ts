@@ -169,7 +169,7 @@ export async function listen(pb = false): Promise<void> {
     try {
       // Try binding briefly to check availability
       const probe = Bun.listen<{ buf: string }>({
-        hostname: "0.0.0.0",
+        hostname: ip,
         port,
         socket: { open() {}, data() {}, error() {}, close() {} },
       });
@@ -194,7 +194,7 @@ export async function listen(pb = false): Promise<void> {
   try {
     await new Promise<void>((resolve, reject) => {
       const server = Bun.listen<{ buf: string }>({
-        hostname: "0.0.0.0",
+        hostname: ip,
         port: port!,
         tls: {
           cert: certPem,

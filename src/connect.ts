@@ -46,6 +46,10 @@ export async function connect(code: string, temp = false): Promise<void> {
       hostname: ip,
       port,
       tls: {
+        // rejectUnauthorized is false because the cert is self-signed and has no CA chain.
+        // Security is enforced via explicit SHA-256 fingerprint pinning in the data handler —
+        // the fingerprint is embedded in the share code and verified before any credentials
+        // are sent. No data is transmitted prior to fingerprint verification.
         rejectUnauthorized: false,
       },
       socket: {
