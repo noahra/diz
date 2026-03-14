@@ -138,12 +138,17 @@ function copyToClipboard(text: string): void {
 }
 
 /**
- * Starts a TLS server on a random port, waits up to 3 minutes for one client
- * connection, verifies the one-time token, receives the client's public key,
- * adds it to authorized_keys, and responds with "OK <username>".
+ * Starts a TLS server on a random port, handles two sequential connections:
  *
- * The server first sends "CERT <fingerprint>\n" so the client can verify
- * the certificate before proceeding with the token exchange.
+ * Connection 1 — cert retrieval:
+ *   Server sends "CERT <fingerprintHex> <certPemBase64>\n" and closes.
+ *   The client verifies the fingerprint matches the one embedded in the share
+ *   code, then closes this connection.
+ *
+ * Connection 2 — verified key exchange:
+ *   Client reconnects with full TLS verification (ca: receivedCertPem).
+ *   Server does NOT send CERT again; it waits for "token pubkey\n".
+ *   On success, server responds "OK <username>\n" and shuts down.
  */
 export async function listen(pb = false): Promise<void> {
   let certPem: string;
@@ -157,6 +162,9 @@ export async function listen(pb = false): Promise<void> {
     cleanupCerts();
     throw err;
   }
+
+  // Encode cert PEM as single-line base64 for embedding in the CERT message
+  const certPemBase64 = Buffer.from(certPem).toString("base64");
 
   const ip = getLocalIP();
   const tokenBytes = randomTokenBytes();
@@ -191,6 +199,9 @@ export async function listen(pb = false): Promise<void> {
   }
   console.log(`Waiting for connection... (times out in 3 minutes)`);
 
+  // Track which connection we are on: false = first (cert retrieval), true = second (key exchange)
+  let certRetrievalDone = false;
+
   try {
     await new Promise<void>((resolve, reject) => {
       const server = Bun.listen<{ buf: string }>({
@@ -203,10 +214,17 @@ export async function listen(pb = false): Promise<void> {
         socket: {
           open(socket) {
             socket.data = { buf: "" };
-            // Send fingerprint first so client can verify before token exchange
-            socket.write(`CERT ${fingerprintHex}\n`);
+            if (!certRetrievalDone) {
+              // First connection: send fingerprint + cert PEM so client can verify
+              socket.write(`CERT ${fingerprintHex} ${certPemBase64}\n`);
+              socket.end();
+            }
+            // Second connection: do nothing — wait for "token pubkey" from client
           },
           data(socket, chunk) {
+            // Data only expected on the second connection
+            if (!certRetrievalDone) return;
+
             socket.data.buf += new TextDecoder().decode(chunk);
 
             const newlineIdx = socket.data.buf.indexOf("\n");
@@ -252,7 +270,12 @@ export async function listen(pb = false): Promise<void> {
             server.stop(true);
             reject(err);
           },
-          close() {},
+          close() {
+            // When the first connection closes, mark cert retrieval as done
+            if (!certRetrievalDone) {
+              certRetrievalDone = true;
+            }
+          },
         },
       });
 
