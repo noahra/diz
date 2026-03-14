@@ -4,25 +4,31 @@
 
 # diz
 
-> Ever tried to SSH into another machine and somehow ended up spending 20 minutes copying keys around like it's 2003?
->
-> Yeah. Same.
->
-> **diz** fixes that.
+**diz is like [Magic Wormhole](https://magic-wormhole.readthedocs.io/en/latest/) but for SSH key exchange.**
 
-Run one command on each machine, share a short code, and you're in. No key juggling required.
+Run one command on each machine, share a short code, and you have authenticated SSH access. No manual key copying, no password auth, no editing `authorized_keys` by hand.
+
+The code encodes everything needed for a secure first contact — IP, port, a one-time token, and a TLS certificate fingerprint. The connection is encrypted and pinned against MITM from the start.
 
 ---
 
 ## How it works
 
-**On the machine you want to connect to:**
+**Machine A — the machine you want to connect to:**
 
 ![server](demo-server.gif)
 
-**On your machine:**
+```bash
+diz --listen
+```
+
+**Machine B — your machine:**
 
 ![client](demo-client.gif)
+
+```bash
+diz --connect <code>
+```
 
 diz opens a temporary authenticated channel, swaps your public key, adds it to `authorized_keys`, and drops you straight into a shell. No file copying, no manual editing, no crying.
 
