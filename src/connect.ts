@@ -22,105 +22,28 @@ function decodeCode(code: string): {
   return { ip, port, token, fingerprint };
 }
 
-// Step 1: connect with rejectUnauthorized: false to retrieve the server's cert
-// PEM. The fingerprint is verified against the share code before any
-// credentials are sent, so the insecure connection is safe at this stage.
-function retrieveAndVerifyCert(
+// Single connection: receive the CERT from the server, verify its fingerprint
+// against the share code, then send the token and public key on the same
+// socket and wait for "OK <username>".
+//
+// Sending credentials over a rejectUnauthorized: false connection is safe here
+// because we verify the fingerprint before writing anything — we know we are
+// talking to the right machine.
+function connectAndExchange(
   ip: string,
   port: number,
   fingerprint: string,
+  token: string,
+  keyLine: string,
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
-    Bun.connect<{ buf: string }>({
+    Bun.connect<{ buf: string; certVerified: boolean }>({
       hostname: ip,
       port,
       tls: { rejectUnauthorized: false },
       socket: {
         open(socket) {
-          socket.data = { buf: "" };
-        },
-        data(socket, chunk) {
-          socket.data.buf += new TextDecoder().decode(chunk);
-
-          const newlineIdx = socket.data.buf.indexOf("\n");
-          if (newlineIdx === -1) return;
-
-          const line = socket.data.buf.slice(0, newlineIdx).trim();
-
-          if (!line.startsWith("CERT ")) {
-            socket.end();
-            reject(new Error("Expected CERT message from server."));
-            return;
-          }
-
-          const parts = line.slice(5).trim().split(" ");
-          if (parts.length !== 2) {
-            socket.end();
-            reject(
-              new Error(
-                "Malformed CERT message: expected fingerprint and PEM.",
-              ),
-            );
-            return;
-          }
-
-          const [, certPemBase64] = parts;
-          const certPem = Buffer.from(certPemBase64, "base64").toString("utf8");
-
-          const derBase64 = certPem
-            .replace(/-----[^-]+-----/g, "")
-            .replace(/\s/g, "");
-          const derBytes = Buffer.from(derBase64, "base64");
-          const computedFingerprint = createHash("sha256")
-            .update(derBytes)
-            .digest("hex");
-
-          if (computedFingerprint !== fingerprint) {
-            socket.end();
-            reject(
-              new Error(
-                "Certificate fingerprint mismatch — possible MITM attack",
-              ),
-            );
-            return;
-          }
-
-          socket.end();
-          resolve(certPem);
-        },
-        error(_socket, err) {
-          reject(err);
-        },
-        close() {},
-      },
-    }).catch(reject);
-  });
-}
-
-// Step 2: reconnect with full TLS verification using the pinned cert, then
-// send the token and public key and wait for "OK <username>".
-// We intentionally reconnect rather than reusing the step-1 socket so that
-// TLS itself verifies the cert (rejectUnauthorized: true, ca: certPem),
-// not just our manual fingerprint check. Sending credentials over the
-// rejectUnauthorized: false socket would undermine that guarantee.
-function exchangeKey(
-  ip: string,
-  port: number,
-  certPem: string,
-  token: string,
-  keyLine: string,
-): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    Bun.connect<{ buf: string; certReceived: boolean }>({
-      hostname: ip,
-      port,
-      tls: {
-        rejectUnauthorized: true,
-        ca: certPem,
-      },
-      socket: {
-        open(socket) {
-          socket.data = { buf: "", certReceived: false };
+          socket.data = { buf: "", certVerified: false };
         },
         data(socket, chunk) {
           socket.data.buf += new TextDecoder().decode(chunk);
@@ -131,10 +54,44 @@ function exchangeKey(
           const line = socket.data.buf.slice(0, newlineIdx).trim();
           socket.data.buf = socket.data.buf.slice(newlineIdx + 1);
 
-          if (!socket.data.certReceived) {
-            // Server always sends CERT first — discard it, cert was already
-            // verified in step 1. Now send credentials over the pinned connection.
-            socket.data.certReceived = true;
+          if (!socket.data.certVerified) {
+            if (!line.startsWith("CERT ")) {
+              socket.end();
+              reject(new Error("Expected CERT message from server."));
+              return;
+            }
+
+            const parts = line.slice(5).trim().split(" ");
+            if (parts.length !== 2) {
+              socket.end();
+              reject(
+                new Error(
+                  "Malformed CERT message: expected fingerprint and PEM.",
+                ),
+              );
+              return;
+            }
+
+            const certPem = Buffer.from(parts[1], "base64").toString("utf8");
+            const derBase64 = certPem
+              .replace(/-----[^-]+-----/g, "")
+              .replace(/\s/g, "");
+            const derBytes = Buffer.from(derBase64, "base64");
+            const computedFingerprint = createHash("sha256")
+              .update(derBytes)
+              .digest("hex");
+
+            if (computedFingerprint !== fingerprint) {
+              socket.end();
+              reject(
+                new Error(
+                  "Certificate fingerprint mismatch — possible MITM attack",
+                ),
+              );
+              return;
+            }
+
+            socket.data.certVerified = true;
             socket.write(`${token} ${keyLine}\n`);
             return;
           }
@@ -164,8 +121,7 @@ export async function connect(code: string, temp = false): Promise<void> {
   }
 
   const keyLine = readPublicKey();
-  const certPem = await retrieveAndVerifyCert(ip, port, fingerprint);
-  const response = await exchangeKey(ip, port, certPem, token, keyLine);
+  const response = await connectAndExchange(ip, port, fingerprint, token, keyLine);
 
   if (!response.startsWith("OK ")) {
     throw new Error(`Unexpected server response: "${response}"`);
