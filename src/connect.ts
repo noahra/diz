@@ -121,7 +121,13 @@ export async function connect(code: string, temp = false): Promise<void> {
   }
 
   const keyLine = readPublicKey();
-  const response = await connectAndExchange(ip, port, fingerprint, token, keyLine);
+  const response = await connectAndExchange(
+    ip,
+    port,
+    fingerprint,
+    token,
+    keyLine,
+  );
 
   if (!response.startsWith("OK ")) {
     throw new Error(`Unexpected server response: "${response}"`);
