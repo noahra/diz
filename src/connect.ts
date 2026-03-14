@@ -99,6 +99,10 @@ function retrieveAndVerifyCert(
 
 // Step 2: reconnect with full TLS verification using the pinned cert, then
 // send the token and public key and wait for "OK <username>".
+// We intentionally reconnect rather than reusing the step-1 socket so that
+// TLS itself verifies the cert (rejectUnauthorized: true, ca: certPem),
+// not just our manual fingerprint check. Sending credentials over the
+// rejectUnauthorized: false socket would undermine that guarantee.
 function exchangeKey(
   ip: string,
   port: number,

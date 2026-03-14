@@ -6,6 +6,20 @@ const TIMEOUT_MS = 180_000;
 const CERT_PATH = "/tmp/diz-cert.pem";
 const KEY_PATH = "/tmp/diz-key.pem";
 
+function checkDependencies(): void {
+  for (const bin of ["openssl", "ssh-keygen"]) {
+    const result = Bun.spawnSync(["which", bin], {
+      stdout: "ignore",
+      stderr: "ignore",
+    });
+    if (result.exitCode !== 0) {
+      throw new Error(
+        `Required dependency not found: ${bin}. Install it and try again.`,
+      );
+    }
+  }
+}
+
 function randomPort(): number {
   return Math.floor(Math.random() * (65535 - 49152) + 49152);
 }
@@ -158,6 +172,8 @@ function findAvailablePort(ip: string): number {
  *   Server waits for "token pubkey\n", then responds "OK <username>\n".
  */
 export async function listen(pb = false): Promise<void> {
+  checkDependencies();
+
   let certPem: string;
   let keyPem: string;
   let fingerprintHex: string;

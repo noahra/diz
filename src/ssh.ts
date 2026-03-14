@@ -102,31 +102,48 @@ export async function generateKey(): Promise<string> {
   return readPublicKey();
 }
 
+// Interface name prefixes that are virtual/container networks and should be
+// skipped when looking for the real LAN IP.
+const VIRTUAL_PREFIXES = [
+  "docker",
+  "br-",
+  "veth",
+  "virbr",
+  "vbox",
+  "vmnet",
+  "utun",
+  "tun",
+  "tap",
+];
+
+function isVirtual(name: string): boolean {
+  return VIRTUAL_PREFIXES.some((p) => name.startsWith(p));
+}
+
 export function getLocalIP(): string {
   const ifaces = networkInterfaces();
-  const preferred = ["en0", "eth0"];
 
-  for (const name of preferred) {
+  // Prefer common physical interface names in order.
+  for (const name of ["en0", "eth0", "wlan0"]) {
     const addrs = ifaces[name];
-    if (addrs) {
-      for (const addr of addrs) {
-        if (addr.family === "IPv4" && !addr.internal) {
-          return addr.address;
-        }
-      }
-    }
-  }
-
-  for (const addrs of Object.values(ifaces)) {
     if (!addrs) continue;
     for (const addr of addrs) {
-      if (addr.family === "IPv4" && !addr.internal) {
-        return addr.address;
-      }
+      if (addr.family === "IPv4" && !addr.internal) return addr.address;
     }
   }
 
-  throw new Error("Could not determine local IP address.");
+  // Fall back to any non-internal, non-virtual IPv4 interface.
+  for (const [name, addrs] of Object.entries(ifaces)) {
+    if (!addrs || isVirtual(name)) continue;
+    for (const addr of addrs) {
+      if (addr.family === "IPv4" && !addr.internal) return addr.address;
+    }
+  }
+
+  throw new Error(
+    "Could not determine local IP address. " +
+      "Try specifying the interface manually with --ip.",
+  );
 }
 
 export function getUsername(): string {
