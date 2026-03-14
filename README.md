@@ -52,7 +52,7 @@ yay -S diz-bin
 | `diz --listen`                   | Advertise this machine and wait for a key                 |
 | `diz --listen --pb`              | Same, but copy the share code to clipboard                |
 | `diz --connect <code>`           | Send your key and SSH in                                  |
-| `diz --connect --temp <code>`    | Same, but delete the generated SSH keys after the session ends (useful on shared or borrowed machines) |
+| `diz --connect <code> --temp`    | Same, but delete the generated SSH keys after the session ends (useful on shared or borrowed machines) |
 
 ---
 
