@@ -1,6 +1,6 @@
 import { base58Decode } from "./encode";
 import { readPublicKey, generateKey } from "./ssh";
-import { existsSync } from "fs";
+import { existsSync, unlinkSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
@@ -27,10 +27,14 @@ function decodeCode(code: string): {
   return { ip, port, token, fingerprint };
 }
 
-export async function connect(code: string): Promise<void> {
+export async function connect(code: string, temp = false): Promise<void> {
   const { ip, port, token, fingerprint } = decodeCode(code);
 
-  if (!existsSync(join(homedir(), ".ssh", "id_ed25519"))) {
+  const privKeyPath = join(homedir(), ".ssh", "id_ed25519");
+  const pubKeyPath = join(homedir(), ".ssh", "id_ed25519.pub");
+  const keyExistedBefore = existsSync(privKeyPath);
+
+  if (!keyExistedBefore) {
     console.log("No SSH key found, generating one...");
     await generateKey();
   }
@@ -106,4 +110,10 @@ export async function connect(code: string): Promise<void> {
     stderr: "inherit",
   });
   await ssh.exited;
+
+  if (temp && !keyExistedBefore) {
+    unlinkSync(privKeyPath);
+    if (existsSync(pubKeyPath)) unlinkSync(pubKeyPath);
+    console.log("Temporary session ended. SSH keys deleted.");
+  }
 }

@@ -21,6 +21,10 @@ program
   .option(
     "-c, --connect <code>",
     "Connect to a listening server using its share code (run on client)",
+  )
+  .option(
+    "-t, --temp",
+    "Delete generated SSH keys after the session ends (use with --connect)",
   );
 
 program.parse(process.argv);
@@ -29,6 +33,7 @@ const opts = program.opts<{
   listen?: boolean;
   pb?: boolean;
   connect?: string;
+  temp?: boolean;
 }>();
 
 if (opts.listen) {
@@ -40,7 +45,7 @@ if (opts.listen) {
   }
 } else if (opts.connect !== undefined) {
   try {
-    await connect(opts.connect);
+    await connect(opts.connect, opts.temp);
   } catch (err) {
     console.error(`Error: ${(err as Error).message}`);
     process.exit(1);
