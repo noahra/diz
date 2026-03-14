@@ -121,6 +121,8 @@ function isVirtual(name: string): boolean {
 }
 
 export function getLocalIP(): string {
+  if (process.env.IP_OVERRIDE) return process.env.IP_OVERRIDE;
+
   const ifaces = networkInterfaces();
 
   // Prefer common physical interface names in order.
@@ -142,7 +144,7 @@ export function getLocalIP(): string {
 
   throw new Error(
     "Could not determine local IP address. " +
-      "Try specifying the interface manually with --ip.",
+      "Set the IP_OVERRIDE environment variable to force a specific address.",
   );
 }
 

@@ -268,7 +268,7 @@ export async function listen(pb = false): Promise<void> {
 
       const timeout = setTimeout(() => {
         server.stop(true);
-        reject(new Error("Timed out after 30s — no client connected."));
+        reject(new Error("Timed out after 3 minutes — no client connected."));
       }, TIMEOUT_MS);
     });
   } finally {
