@@ -71,3 +71,23 @@ diz uses your local network IP, so it works out of the box on the same network. 
 ## Security
 
 diz uses TLS with certificate pinning for the key exchange. The connection is encrypted end-to-end and protected against man-in-the-middle attacks. Each session generates a one-time certificate, and the fingerprint is embedded in the share code, so any tampering is detected and the connection is aborted immediately.
+
+## Threat model & honest limitations
+
+diz is **not** trying to replace ssh-copy-id when you already have access.
+It is for the narrow case where:
+- You can run a command on both machines
+- You can share a short code out-of-band (chat, voice, in-person, Signal, etc.)
+- You do NOT want to manually copy-paste/type a 70+ character base64 pubkey
+
+It is intentionally **short-lived and single-use**.
+It is **not** appropriate for:
+- High-security production servers
+- Environments where you cannot verify the share-code out-of-band
+- Situations where both machines are behind aggressive NAT without VPN
+
+Security properties:
+- TLS + cert fingerprint pinning via out-of-band code
+- One-time 128-bit token
+- No persistent listener
+- No central server / relay
