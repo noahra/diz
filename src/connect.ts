@@ -5,19 +5,12 @@ import { join } from "path";
 import { homedir } from "os";
 import { createHash } from "crypto";
 
-/**
- * Decodes the base58 code to "ip:port:token:fingerprint", connects to the TLS
- * server using a two-step handshake, verifies the certificate fingerprint,
- * sends the local public key, waits for "OK <username>", then spawns an
- * interactive SSH session.
- */
 function decodeCode(code: string): {
   ip: string;
   port: number;
   token: string;
   fingerprint: string;
 } {
-  // Binary packet: [4 bytes IP][2 bytes port][16 bytes token][32 bytes fingerprint]
   const packet = base58Decode(code);
   if (packet.length !== 54) {
     throw new Error("Invalid code format.");
@@ -29,12 +22,9 @@ function decodeCode(code: string): {
   return { ip, port, token, fingerprint };
 }
 
-/**
- * Step 1: Connect with rejectUnauthorized: false and retrieve the cert PEM
- * from the server's "CERT <fingerprintHex> <certPemBase64>" message.
- * Verifies the SHA-256 fingerprint of the DER-encoded cert against the
- * fingerprint embedded in the share code. Aborts on mismatch.
- */
+// Step 1: connect with rejectUnauthorized: false to retrieve the server's cert
+// PEM. The fingerprint is verified against the share code before any
+// credentials are sent, so the insecure connection is safe at this stage.
 function retrieveAndVerifyCert(
   ip: string,
   port: number,
@@ -44,12 +34,7 @@ function retrieveAndVerifyCert(
     Bun.connect<{ buf: string }>({
       hostname: ip,
       port,
-      tls: {
-        // rejectUnauthorized is false only for cert retrieval. The received cert
-        // PEM is verified against the SHA-256 fingerprint embedded in the share
-        // code before any credentials are sent.
-        rejectUnauthorized: false,
-      },
+      tls: { rejectUnauthorized: false },
       socket: {
         open(socket) {
           socket.data = { buf: "" };
@@ -62,7 +47,6 @@ function retrieveAndVerifyCert(
 
           const line = socket.data.buf.slice(0, newlineIdx).trim();
 
-          // Expect "CERT <fingerprintHex> <certPemBase64>"
           if (!line.startsWith("CERT ")) {
             socket.end();
             reject(new Error("Expected CERT message from server."));
@@ -80,10 +64,9 @@ function retrieveAndVerifyCert(
             return;
           }
 
-          const [serverFingerprint, certPemBase64] = parts;
+          const [, certPemBase64] = parts;
           const certPem = Buffer.from(certPemBase64, "base64").toString("utf8");
 
-          // Verify fingerprint: SHA-256 of the DER-encoded cert
           const derBase64 = certPem
             .replace(/-----[^-]+-----/g, "")
             .replace(/\s/g, "");
@@ -102,7 +85,6 @@ function retrieveAndVerifyCert(
             return;
           }
 
-          // Fingerprint verified — the server will close this connection
           socket.end();
           resolve(certPem);
         },
@@ -115,10 +97,8 @@ function retrieveAndVerifyCert(
   });
 }
 
-/**
- * Step 2: Reconnect with rejectUnauthorized: true and ca set to the verified
- * cert PEM. Send the token and public key, wait for "OK <username>".
- */
+// Step 2: reconnect with full TLS verification using the pinned cert, then
+// send the token and public key and wait for "OK <username>".
 function exchangeKey(
   ip: string,
   port: number,
@@ -137,7 +117,6 @@ function exchangeKey(
       socket: {
         open(socket) {
           socket.data = { buf: "" };
-          // Send token and public key immediately upon connection
           socket.write(`${token} ${keyLine}\n`);
         },
         data(socket, chunk) {
@@ -172,11 +151,7 @@ export async function connect(code: string, temp = false): Promise<void> {
   }
 
   const keyLine = readPublicKey();
-
-  // Step 1: retrieve and verify the server's certificate
   const certPem = await retrieveAndVerifyCert(ip, port, fingerprint);
-
-  // Step 2: reconnect with full TLS verification and exchange the key
   const response = await exchangeKey(ip, port, certPem, token, keyLine);
 
   if (!response.startsWith("OK ")) {

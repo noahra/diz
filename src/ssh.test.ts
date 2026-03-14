@@ -21,8 +21,6 @@ function isDuplicateKey(existing: string, keyLine: string): boolean {
   return false;
 }
 
-// --- Tests ---
-
 describe("parsePublicKeyLine", () => {
   it("strips comment from key line", () => {
     const line = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA my-comment";

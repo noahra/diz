@@ -26,7 +26,6 @@ function encodeCode(
   tokenBytes: Uint8Array,
   fingerprintBytes: Uint8Array,
 ): Uint8Array {
-  // [4 bytes IP][2 bytes port big-endian][16 bytes token][32 bytes fingerprint]
   const packet = new Uint8Array(54);
   const octets = ip.split(".").map(Number);
   packet[0] = octets[0];
@@ -41,22 +40,15 @@ function encodeCode(
 }
 
 function cleanupCerts(): void {
-  if (existsSync(CERT_PATH)) {
-    try {
-      unlinkSync(CERT_PATH);
-    } catch {}
-  }
-  if (existsSync(KEY_PATH)) {
-    try {
-      unlinkSync(KEY_PATH);
-    } catch {}
+  for (const path of [CERT_PATH, KEY_PATH]) {
+    if (existsSync(path)) {
+      try {
+        unlinkSync(path);
+      } catch {}
+    }
   }
 }
 
-/**
- * Generates a temporary self-signed EC (P-256) certificate using openssl.
- * Returns { certPem, keyPem, fingerprint } where fingerprint is a 64-char lowercase hex string.
- */
 function generateTLSCert(): {
   certPem: string;
   keyPem: string;
@@ -105,7 +97,7 @@ function generateTLSCert(): {
     throw new Error(`openssl fingerprint failed: ${errText.trim()}`);
   }
 
-  // Output looks like: SHA256 Fingerprint=AA:BB:CC:...
+  // Output format: "SHA256 Fingerprint=AA:BB:CC:..."
   const fpOutput = new TextDecoder().decode(fpResult.stdout).trim();
   const eqIdx = fpOutput.indexOf("=");
   if (eqIdx === -1) {
@@ -125,9 +117,6 @@ function generateTLSCert(): {
   return { certPem, keyPem, fingerprintHex, fingerprintBytes };
 }
 
-/**
- * Copies text to the system clipboard.
- */
 function copyToClipboard(text: string): void {
   const cmd =
     process.platform === "darwin" ? "pbcopy" : "xclip -selection clipboard";
@@ -137,18 +126,36 @@ function copyToClipboard(text: string): void {
   if (proc.exitCode !== 0) throw new Error("Failed to copy to clipboard.");
 }
 
+function findAvailablePort(ip: string): number {
+  for (let i = 0; i < 10; i++) {
+    const port = randomPort();
+    try {
+      const probe = Bun.listen<{ buf: string }>({
+        hostname: ip,
+        port,
+        socket: { open() {}, data() {}, error() {}, close() {} },
+      });
+      probe.stop(true);
+      return port;
+    } catch {
+      if (i === 9)
+        throw new Error("Could not find an available port after 10 attempts.");
+    }
+  }
+  // unreachable, but satisfies the type checker
+  throw new Error("Could not find an available port after 10 attempts.");
+}
+
 /**
- * Starts a TLS server on a random port, handles two sequential connections:
+ * Starts a TLS server and handles two sequential connections:
  *
  * Connection 1 — cert retrieval:
  *   Server sends "CERT <fingerprintHex> <certPemBase64>\n" and closes.
- *   The client verifies the fingerprint matches the one embedded in the share
- *   code, then closes this connection.
+ *   The client verifies the fingerprint matches the one in the share code.
  *
  * Connection 2 — verified key exchange:
  *   Client reconnects with full TLS verification (ca: receivedCertPem).
- *   Server does NOT send CERT again; it waits for "token pubkey\n".
- *   On success, server responds "OK <username>\n" and shuts down.
+ *   Server waits for "token pubkey\n", then responds "OK <username>\n".
  */
 export async function listen(pb = false): Promise<void> {
   let certPem: string;
@@ -163,35 +170,13 @@ export async function listen(pb = false): Promise<void> {
     throw err;
   }
 
-  // Encode cert PEM as single-line base64 for embedding in the CERT message
   const certPemBase64 = Buffer.from(certPem).toString("base64");
-
   const ip = getLocalIP();
   const tokenBytes = randomTokenBytes();
   const token = bytesToHex(tokenBytes);
+  const port = findAvailablePort(ip);
 
-  // Find an available port before printing the code
-  let port: number;
-  for (let i = 0; i < 10; i++) {
-    port = randomPort();
-    try {
-      // Try binding briefly to check availability
-      const probe = Bun.listen<{ buf: string }>({
-        hostname: ip,
-        port,
-        socket: { open() {}, data() {}, error() {}, close() {} },
-      });
-      probe.stop(true);
-      break;
-    } catch {
-      if (i === 9)
-        throw new Error("Could not find an available port after 10 attempts.");
-    }
-  }
-
-  const code = base58Encode(
-    encodeCode(ip, port!, tokenBytes, fingerprintBytes),
-  );
+  const code = base58Encode(encodeCode(ip, port, tokenBytes, fingerprintBytes));
   console.log(`Share this code: ${code}`);
   if (pb) {
     copyToClipboard(code);
@@ -199,14 +184,13 @@ export async function listen(pb = false): Promise<void> {
   }
   console.log(`Waiting for connection... (times out in 3 minutes)`);
 
-  // Track which connection we are on: false = first (cert retrieval), true = second (key exchange)
   let certRetrievalDone = false;
 
   try {
     await new Promise<void>((resolve, reject) => {
       const server = Bun.listen<{ buf: string }>({
         hostname: ip,
-        port: port!,
+        port,
         tls: {
           cert: certPem,
           key: keyPem,
@@ -215,14 +199,11 @@ export async function listen(pb = false): Promise<void> {
           open(socket) {
             socket.data = { buf: "" };
             if (!certRetrievalDone) {
-              // First connection: send fingerprint + cert PEM so client can verify
               socket.write(`CERT ${fingerprintHex} ${certPemBase64}\n`);
               socket.end();
             }
-            // Second connection: do nothing — wait for "token pubkey" from client
           },
           data(socket, chunk) {
-            // Data only expected on the second connection
             if (!certRetrievalDone) return;
 
             socket.data.buf += new TextDecoder().decode(chunk);
@@ -271,10 +252,7 @@ export async function listen(pb = false): Promise<void> {
             reject(err);
           },
           close() {
-            // When the first connection closes, mark cert retrieval as done
-            if (!certRetrievalDone) {
-              certRetrievalDone = true;
-            }
+            certRetrievalDone = true;
           },
         },
       });
