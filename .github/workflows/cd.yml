@@ -35,7 +35,7 @@ jobs:
           echo "linux=$(shasum -a 256 diz-linux-x64 | cut -d' ' -f1)" >> $GITHUB_OUTPUT
 
       - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             diz-darwin-arm64
